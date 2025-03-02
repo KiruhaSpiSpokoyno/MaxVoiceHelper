@@ -34,11 +34,6 @@ Screen {
 }
 
 Log {
-    border: round $primary;
-    padding: 1;
-    margin: 1 2;
-    height: 60%;
-    background: $surface;
     color: $text;
 }
 

@@ -19,6 +19,10 @@ import re
 from textual import on
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, Static, Log
+import asyncio
+from functools import partial
+import logging
+logging.basicConfig(level=logging.DEBUG)
 
 # Класс ассистента
 class Bot:
@@ -78,7 +82,7 @@ class AssistantUI(App):
             id="history-label",
             classes="box"
         )
-        yield Log(highlight=True, classes="logbox")
+        yield Log(highlight=True, classes="logbox")  # Убрали несуществующий параметр markup
         yield Footer()
 
     def update_status(self, message: str) -> None:
@@ -91,64 +95,95 @@ class AssistantUI(App):
         self.run_worker(self.process_commands())
 
     async def process_commands(self):
-        while True:
-            query = record().lower()
-            activation_pattern = re.compile(
-                rf'^\s*{re.escape(self.bot.bot_name_ru.lower())}\b[\s,!;]*',
-                re.IGNORECASE
-            )
-            match = activation_pattern.match(query)
-
-            if not match:
-                self.add_log(f"[bold red]Игнор:[/] {query}")
-                continue
-
-            command = query[match.end():].strip()
-
-            if not command:
-                speak(self.bot, "Да, слушаю вас!")
-                self.add_log("[bold blue]Активация:[/] Получена пустая команда")
-                continue
-
-            self.add_log(f"[bold green]Команда:[/] {command}")
-
+        """
+        Основной цикл обработки команд голосового помощника.
+        Работает в фоновом режиме, ожидая активации и выполнения команд.
+        """
+        while True:  # Бесконечный цикл для постоянного ожидания команд
             try:
-                if any(x in command for x in ["википедия", "wikipedia"]):
-                    self.update_status("Поиск в Википедии...")
-                    search_wiki(command)
-                elif any(x in command for x in ["гугл", "google"]):
-                    self.update_status("Поиск в Google...")
-                    search_google(command)
-                elif any(x in command for x in ["яндекс", "yandex"]):
-                    self.update_status("Поиск в Яндексе...")
-                    search_yandex(command)
-                elif any(x in command for x in ["ютуб", "youtube"]):
-                    self.update_status("Поиск на YouTube...")
-                    search_youtube(command)
-                elif any(x in command for x in ["рутуб", "rutube"]):
-                    self.update_status("Поиск на RuTube...")
-                    search_rutube(command)
-                elif any(x in command for x in ["открой", "open"]):
-                    self.update_status("Открытие сайта...")
-                    search_website(command)
-                elif any(x in command for x in ["переведи", "перевод", "translate"]):
-                    self.update_status("Перевод...")
-                    translate(command)
-                elif any(x in command for x in ["время", "time"]):
-                    self.update_status("Определение времени...")
-                    time()
-                elif any(x in command for x in ["запуск", "запусти", "start"]):
-                    self.update_status("Запуск приложения...")
-                    start_app(command)
-                elif any(x in command for x in ["музыка", "музыку", "music"]):
-                    self.update_status("Запуск музыки...")
-                    play_music()
+                # 1. Получение голосовой команды
+                query = await self.run_async(record).lower()  # Асинхронный вызов функции записи
 
-                self.update_status("Готов к работе")
+                # 2. Проверка активации помощника
+                activation_pattern = re.compile(
+                    rf'^\s*{re.escape(self.bot.bot_name_ru.lower())}\b[\s,!;]*',
+                    re.IGNORECASE
+                )
+                match = activation_pattern.match(query)
+
+                # Если команда не содержит активации, игнорируем её
+                if not match:
+                    self.add_log(f"[bold red]Игнор:[/] {query}")
+                    await asyncio.sleep(0.1)  # Короткая пауза перед следующей итерацией
+                    continue
+
+                # 3. Извлечение команды после активации
+                command = query[match.end():].strip()
+
+                # Если команда пустая, просто отвечаем
+                if not command:
+                    await speak(self.bot, "Да, слушаю вас!")
+                    self.add_log("[bold blue]Активация:[/] Получена пустая команда")
+                    continue
+
+                # 4. Логирование команды
+                self.add_log(f"[bold green]Команда:[/] {command}")
+
+                # 5. Обработка команды
+                try:
+                    if any(x in command for x in ["википедия", "wikipedia"]):
+                        self.update_status("Поиск в Википедии...")
+                        search_wiki(command)
+                    elif any(x in command for x in ["гугл", "google"]):
+                        self.update_status("Поиск в Google...")
+                        search_google(command)
+                    elif any(x in command for x in ["яндекс", "yandex"]):
+                        self.update_status("Поиск в Яндексе...")
+                        search_yandex(command)
+                    elif any(x in command for x in ["ютуб", "youtube"]):
+                        self.update_status("Поиск на YouTube...")
+                        search_youtube(command)
+                    elif any(x in command for x in ["рутуб", "rutube"]):
+                        self.update_status("Поиск на RuTube...")
+                        search_rutube(command)
+                    elif any(x in command for x in ["открой", "open"]):
+                        self.update_status("Открытие сайта...")
+                        search_website(command)
+                    elif any(x in command for x in ["переведи", "перевод", "translate"]):
+                        self.update_status("Перевод...")
+                        translate(command)
+                    elif any(x in command for x in ["время", "time"]):
+                        self.update_status("Определение времени...")
+                        time()
+                    elif any(x in command for x in ["запуск", "запусти", "start"]):
+                        self.update_status("Запуск приложения...")
+                        start_app(command)
+                    elif any(x in command for x in ["музыка", "музыку", "music"]):
+                        self.update_status("Запуск музыки...")
+                        play_music()
+
+                    # Возвращаем статус "Готов к работе" после выполнения команды
+                    self.update_status("Готов к работе")
+
+                except Exception as e:
+                    # Логируем ошибку выполнения команды
+                    self.add_log(f"[bold red]Ошибка выполнения команды:[/] {str(e)}")
+                    self.update_status("Ошибка выполнения")
+                    traceback.print_exc()
+
+                # 6. Короткая пауза перед следующей итерацией
+                await asyncio.sleep(0.1)
+
+            except asyncio.CancelledError:
+                # Корректное завершение при закрытии приложения
+                self.add_log("[bold yellow]Завершение работы помощника...[/]")
+                break
 
             except Exception as e:
-                self.add_log(f"[bold red]Ошибка:[/] {str(e)}")
-                self.update_status("Ошибка выполнения")
+                # Логируем критические ошибки
+                self.add_log(f"[bold red]Критическая ошибка:[/] {str(e)}")
+                traceback.print_exc()
+                await asyncio.sleep(1)  # Защита от бесконечного цикла ошибок
 
 def record():
     query = ""
@@ -168,22 +203,22 @@ def record():
     return query
 
 # Воспроизведение речи ассистента
-def speak(my_bot, text):
+async def speak(my_bot, text):
     print(f"{my_bot.bot_name_ru} говорит: {text}.")
     engine.say(text)
-    engine.runAndWait()
+    await asyncio.to_thread(engine.runAndWait)
 
 # Приветственное сообщение при запуске программы
-def greetings():
-    hour = int(datetime.datetime.now().hour)
-    if hour >= 0 and hour < 6:
-        speak(trex, f"Доброй ночи! Я - {trex.bot_name_ru}, твой голосовой помощник. Чем могу помочь?")
-    elif hour >= 6 and hour < 12:
-        speak(trex, f"Доброе утро! Я - {trex.bot_name_ru}, твой голосовой помощник. Чем могу помочь?")
-    elif hour >= 12 and hour < 18:
-        speak(trex, f"Асалам малекум дорогой! Я - {trex.bot_name_ru}, твой голосовой помощник. Чем могу помочь?")
+async def greetings():
+    hour = datetime.datetime.now().hour
+    if 0 <= hour < 6:
+        await speak(trex, f"Доброй ночи! Я - {trex.bot_name_ru}, ваш голосовой помощник.")
+    elif 6 <= hour < 12:
+        await speak(trex, f"Доброе утро! Я - {trex.bot_name_ru}, ваш голосовой помощник.")
+    elif 12 <= hour < 18:
+        await speak(trex, f"Добрый день! Я - {trex.bot_name_ru}, ваш голосовой помощник.")
     else:
-        speak(trex, f"Вечер в хату! Я - {trex.bot_name_ru}, твой голосовой помощник. Чем могу помочь?")
+        await speak(trex, f"Добрый вечер! Я - {trex.bot_name_ru}, ваш голосовой помощник.")
 
 # Online-распознавание речи
 def online_recognition():
@@ -383,9 +418,12 @@ if __name__ == "__main__":
     # Инициализация переводчика
     translator = BotTranslate()
 
-    # Приветствие
-    greetings()
-
     # Запуск приложения
     app = AssistantUI(trex)
-    app.run()
+
+
+    async def main():
+        await app.run_async()
+
+
+    asyncio.run(main())

@@ -1,0 +1,47 @@
+Screen {
+    layout: vertical;
+    background: $surface;
+}
+
+#title {
+    width: 100%;
+    height: 5;
+    padding: 1;
+    text-align: center;
+    background: $boost;
+    color: $primary;
+    text-style: bold;
+}
+
+.box {
+    margin: 1;
+    padding: 1;
+    border: round $primary;
+    width: 100%;
+}
+
+#status {
+    color: $warning;
+    text-style: italic;
+}
+
+.logbox {
+    height: 60%;
+    border: round $success 50%;
+    padding: 1;
+    margin: 1;
+    background: $boost;
+}
+
+Log {
+    border: round $primary;
+    padding: 1;
+    margin: 1 2;
+    height: 60%;
+    background: $surface;
+    color: $text;
+}
+
+Log:focus {
+    border: double $success;
+}

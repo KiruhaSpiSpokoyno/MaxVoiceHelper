@@ -13,24 +13,34 @@ import subprocess       # Запуск новых процессов
 import random       # Генератор случайных чисел
 from pathlib import Path        # Работа с путями файловой системы
 import requests     # Отправка HTTP-запросов и получение ответов от Web-серверов
-import os
-import tkinter as tk
-import re
-from textual import on
-from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, Static, Log
-import asyncio
-from functools import partial
-import logging
+import re   # Работа с регулярными выражениями
+from textual import on  # Декоратор для обработки событий
+from textual.app import App, ComposeResult  # Обработка событий
+from textual.widgets import Header, Footer, Static, Log # Обработка событий
+import asyncio  # Запуск асинхронных операций
+from functools import partial   # Создание частично применённых функций
+
+import logging  # Формирование информации об исключениях
 logging.basicConfig(level=logging.DEBUG)
+
+import os   # Работа с файловой системой
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'  # Скрыть вывод ALSA
+
+
 
 # Класс ассистента
 class Bot:
-    def __init__(self):
-        self.bot_name_ru = "Макс"
-        self.bot_name_en = "Max"
-        self.city = "Москва"
-        self.language = "ru"
+   """
+   Класс ассистента
+   """
+   def __init__(self):
+       """
+       Инициализация ассистента
+       """
+       self.bot_name_ru = "Макс"
+       self.bot_name_en = "Max"
+       self.city = "Москва"
+       self.language = "ru"
 
 # Класс для мультиязычности
 class bot_translate:
@@ -39,51 +49,54 @@ class bot_translate:
 
 # Класс для мультиязычности
 class BotTranslate:
-    def __init__(self):
+    def __init__(self, bot_instance: Bot):
+        self.bot = bot_instance
         with open("translations.json", "r", encoding="UTF-8") as file:
             self.translations = json.load(file)
 
     def get(self, text: str):
         if text in self.translations:
-            return self.translations[text][trex.language]
+            return self.translations[text][self.bot.language]
         else:
             print(f"Для фразы: {text} нет перевода.")
             return text
 
 
 class AssistantUI(App):
-    CSS_PATH = "style.tcss"
-    BINDINGS = [("q", "quit", "Выход")]
-
-    def __init__(self, bot_instance):
+    def __init__(self, bot_instance: Bot):
         super().__init__()
         self.bot = bot_instance
 
-    # В классе AssistantUI замените метод compose на этот код
+    CSS_PATH = "style.tcss#v=2"
+    BINDINGS = [("q", "quit", "Выход"), ("d", "toggle_dark", "Тема")]
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Static(
-            f"[b][#3498db]Голосовой помощник[/] [u]{self.bot.bot_name_ru}[/][/]",
+            f"🌀 [b]{self.bot.bot_name_ru}[/] • Голосовой помощник",
             id="title",
             classes="box"
         )
         yield Static(
-            "[#2ecc71]▸ Статус:[/]",
+            "📊 ▸ Статус:",
             id="status-label",
             classes="box"
         )
         yield Static(
-            "[#e67e22]Ожидание активации...[/]",
+            "🟢 Ожидание активации...",
             id="status",
             classes="box"
         )
         yield Static(
-            "[#9b59b6]▸ История команд:[/]",
+            "📜 ▸ История команд:",
             id="history-label",
             classes="box"
         )
-        yield Log(highlight=True, classes="logbox")  # Убрали несуществующий параметр markup
+        yield Log(classes="logbox")
         yield Footer()
+
+    def action_toggle_dark(self) -> None:
+        self.dark = not self.dark
 
     def update_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -186,22 +199,58 @@ class AssistantUI(App):
                 await asyncio.sleep(1)  # Защита от бесконечного цикла ошибок
 
 def record():
+    """
+    Записывает аудио с микрофона и возвращает распознанный текст.
+    """
     query = ""
     with microphone:
-        recognizer.adjust_for_ambient_noise(microphone, duration=1)  # Регулирование уровня окружающего шума
         try:
+            # Регулировка уровня шума
+            recognizer.adjust_for_ambient_noise(microphone, duration=1)
+            
             print(f"{trex.bot_name_ru} слушает...")
-            rec_audio = recognizer.listen(microphone, 5, 5)     # Запись голоса с микрофона
-            with open("recorded_speech.wav", "wb") as file:     # Сохранение аудио в файл
+            
+            # Запись аудио с микрофона
+            rec_audio = recognizer.listen(
+                microphone, 
+                timeout=8,  # Максимальное время ожидания начала речи
+                phrase_time_limit=8  # Максимальная продолжительность фразы
+            )
+            
+            # Сохранение аудио в файл для отладки
+            with open("recorded_speech.wav", "wb") as file:
                 file.write(rec_audio.get_wav_data())
-            query = online_recognition()    # Запуск online-распознавания
+            
+            # Попытка онлайн-распознавания
+            query = online_recognition()
+            
         except sr.WaitTimeoutError:
-            speak(trex, translator.get(""))
+            # Если пользователь ничего не сказал
+            print("Время ожидания истекло.")
+            speak(trex, "Я вас не услышал. Пожалуйста, повторите.")
+            
+        except sr.UnknownValueError:
+            # Если речь не распознана
+            print("Речь не распознана.")
+            speak(trex, "Извините, я не смог распознать вашу речь.")
+            
+        except sr.RequestError as e:
+            # Если возникла проблема с подключением к сервису
+            print(f"Ошибка запроса: {e}")
+            speak(trex, "Произошла ошибка при подключении к сервису распознавания.")
+            
+            # Попытка оффлайн-распознавания
+            query = offline_recognition()
+            
         except Exception as e:
+            # Обработка всех других исключений
             print(f"Ошибка при записи речи: {e}")
             speak(trex, "Произошла ошибка при записи речи. Пожалуйста, повторите запрос.")
-    return query
 
+        except sr.WaitTimeoutError:
+            speak(trex, translator.get("i_didnt_hear"))
+            
+    return query
 # Воспроизведение речи ассистента
 async def speak(my_bot, text):
     print(f"{my_bot.bot_name_ru} говорит: {text}.")
@@ -405,25 +454,20 @@ def play_music():
 # Инициализация и запуск приложения
 if __name__ == "__main__":
     trex = Bot()
-
-    # Инициализация движка голоса
+    
+    # Инициализация компонентов ДО запуска приложения
     engine = pyttsx3.init()
     voices = engine.getProperty('voices')
     engine.setProperty('voice', voices[0].id if trex.language == "ru" else voices[1].id)
-
-    # Инициализация распознавания речи
+    
     recognizer = sr.Recognizer()
     microphone = sr.Microphone()
+    translator = BotTranslate(bot_instance=trex)  # Исправлено здесь
 
-    # Инициализация переводчика
-    translator = BotTranslate()
-
-    # Запуск приложения
-    app = AssistantUI(trex)
-
-
+    # Создание и запуск приложения
+    app = AssistantUI(bot_instance=trex)
+    
     async def main():
         await app.run_async()
-
 
     asyncio.run(main())

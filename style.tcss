@@ -1,42 +1,83 @@
+$primary: #6C5CE7;
+$success: #00B894;
+$warning: #FDCB6E;
+$error: #D63031;
+$surface: #2D3436;
+$panel: #3d4345;
+$text: #DFE6E9;
+
 Screen {
-    layout: vertical;
+    layers: base overlay;
     background: $surface;
+}
+
+Header {
+    dock: top;
+    padding: 1;
+    background: $primary;
+    color: $text;
+    text-style: bold;
+    content-align: center middle;
+}
+
+Footer {
+    dock: bottom;
+    background: $primary;
+    color: $text;
 }
 
 #title {
     width: 100%;
-    height: 5;
     padding: 1;
+    background: $panel;
+    color: $success;
+    border: round $primary;
+    text-style: italic bold;
     text-align: center;
-    background: $boost;
-    color: $primary;
+}
+
+#status-label {
+    padding: 1;
+    color: $warning;
     text-style: bold;
 }
 
-.box {
-    margin: 1;
+#status {
     padding: 1;
+    background: $panel;
+    color: $text;
     border: round $primary;
-    width: 100%;
+    margin: 1;
 }
 
-#status {
-    color: $warning;
-    text-style: italic;
+#history-label {
+    padding: 1;
+    color: $error;
+    text-style: bold;
 }
 
 .logbox {
     height: 60%;
-    border: round $success 50%;
-    padding: 1;
+    background: $panel;
+    color: $text;
+    border: round $primary;
     margin: 1;
-    background: $boost;
+    padding: 1;
+}
+
+.box {
+    margin: 1 2;
+    padding: 1 2;
+    background: $panel;
+    border: round $primary;
+}
+
+Static {
+    margin: 1 0;
 }
 
 Log {
+    background: $panel;
     color: $text;
-}
-
-Log:focus {
-    border: double $success;
+    padding: 1;
 }

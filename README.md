@@ -1,3 +1,3 @@
 # MaxVoiceHelper
 
-Всё в одну директорию)))
+pip install pyttsx3 SpeechRecognition deep-translator wikipedia-api googletrans==4.0.0-rc1 requests pillow python-dotenv pyaudio
